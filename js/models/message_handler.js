@@ -186,6 +186,7 @@ export default class MessageHandler {
 
   handleAddTable(msg, buffers) {
     const options = convertOptionNamesToCamelCase(msg["options"] || {});
+    const mastItemKey = options.mastItemKey;
     const circleOptions = convertOptionNamesToCamelCase(
       options.circleError || {},
     );
@@ -231,10 +232,23 @@ export default class MessageHandler {
         }
       };
     }
+
     A.catalogFromURL(
       url,
       options,
       (catalog) => {
+        if (mastItemKey) {
+          // Map each source so it's easier to select.
+          catalog.mastItemKey = mastItemKey;
+
+          // Override weird behavior in catalogFromURL that forces onlyFootprints to false if s_region exists.
+          // It says that's the desired behavior for ObsCore.
+          catalog.onlyFootprints = true;
+
+          for (const src of catalog.sources) {
+            this.addSourceToMastMap(src, mastItemKey);
+          }
+        }
         this.aladin.addCatalog(catalog);
       },
       false,

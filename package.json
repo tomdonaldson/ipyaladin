@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev": "pip install -e '.[dev]' && npm run build -- --sourcemap=inline --watch",
-    "build": "esbuild js/widget.js --minify --format=esm --bundle --outdir=src/ipyaladin/static",
+    "build": "esbuild js/widget.js --format=esm --bundle --outdir=src/ipyaladin/static",
     "prepare": "husky install",
     "format": "npx prettier . --write && ruff format",
     "start-test-server": "python3 -m jupyter lab --config js/ui-tests/jupyter_server_test_config.py",

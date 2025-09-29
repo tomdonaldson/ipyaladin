@@ -14,6 +14,28 @@ export default class EventHandler {
     this.model = model;
     this.messageHandler = new MessageHandler(aladin, model);
     this.currentDivNumber = parseInt(aladinDiv.id.split("-").pop());
+    this.mastSourceMap = {};
+  }
+
+  addSourceToMastMap(source, mastItemKey) {
+    const keyMap = this.mastSourceMap;
+    if (!keyMap[mastItemKey]) {
+      keyMap[mastItemKey] = {};
+    }
+    const sourceMap = keyMap[mastItemKey];
+    const key = source.data[mastItemKey];
+    if (key) {
+      sourceMap[key] = source;
+    }
+  }
+
+  getSourceFromMastMap(mastItemKey, sourceKey) {
+    let source = null;
+    let sourceMap = this.mastSourceMap[mastItemKey];
+    if (sourceMap) {
+      source = sourceMap[sourceKey];
+    }
+    return source;
   }
 
   /**
@@ -73,6 +95,59 @@ export default class EventHandler {
   }
 
   /**
+   * Intended to be called on click.  Updates the _selected_objects traitlet to correspond to
+   * whatever is currently selected in aladin.
+   */
+  updateSelections() {
+    // We'll ask the view for the current selected footprints, an Array of footprint Arrays.
+    // Each fp array corresponds to a different catalog, many of which may have been added by the user.
+    // We could ignore all catalogs that aren't named 'MAST Footprints*' since other catalogs won't have
+    // corresponding entries in the search results
+    const selectededObjectLayers = this.aladin.view.selection || [];
+    const selectedResultRows = [];
+    let mastItemKey = null;
+
+    for (const selectedObjectsForCatalog of selectededObjectLayers) {
+      // Peek into this layer's selected objects to see if its our MAST Footprint layer (catalog).
+      // If not, we can skip it since the objects won't correspond to rows in the ResultsTable.
+      //
+      // The selected objects in this layer are either a source (if we couldn't parse the s_region)
+      // or a footprint that knows its source.  The source has the result row data (including search_key) and knows its catalog.
+      if (selectedObjectsForCatalog.length > 0) {
+        const source =
+          selectedObjectsForCatalog[0]?.source || selectedObjectsForCatalog[0];
+        mastItemKey = source?.catalog?.mastItemKey;
+        if (!mastItemKey) {
+          continue;
+        }
+      }
+
+      // For each selected object in the catalog, use the search_key to look up the original result row so we can select it.
+      for (const selectedObject of selectedObjectsForCatalog) {
+        const selectedSource = selectedObject?.source || selectedObject;
+        if (selectedSource.data) {
+          const selectionInfo = {
+            ra: selectedSource.ra,
+            dec: selectedSource.dec,
+            data: selectedSource.data,
+            x: selectedSource.x,
+            y: selectedSource.y,
+          };
+          selectedResultRows.push(selectionInfo);
+        }
+      }
+    }
+
+    // TSD For now don't worry about _selected_objects.  We should make that consistent and probably use it when
+    // we're paying more attention to all the layers.
+    // Send the select event.
+    this.model.send({
+      event_type: "select",
+      content: selectedResultRows,
+    });
+  }
+
+  /**
    * Subscribes to all the events needed for the Aladin Lite widget.
    */
   subscribeAll() {
@@ -108,6 +183,7 @@ export default class EventHandler {
     });
 
     this.model.on("change:_target", () => {
+      console.log("TSD Target updated");
       if (jsTargetLock.locked) {
         jsTargetLock.unlock();
         return;
@@ -254,6 +330,7 @@ export default class EventHandler {
         event_type: "click",
         content: clickContent,
       });
+      this.updateSelections();
     });
 
     this.aladin.on("select", (catalogs) => {
@@ -310,6 +387,63 @@ export default class EventHandler {
       this.aladin
         .getOverlayImageLayer()
         .setAlpha(this.model.get("overlay_survey_opacity"));
+    });
+
+    this.model.on("change:objects_to_select", () => {
+      const objectsToSelect = this.model.get("objects_to_select");
+      console.log("TSD objects_to_select: " + objectsToSelect);
+      const allFpsToSelect = [];
+      const allSourcesToSelect = [];
+
+      for (const layer of objectsToSelect) {
+        let mastItemKey = layer.mast_item_key;
+        const sourcesToSelect = [];
+
+        // Use the map to find the sources to select.
+        for (let sourceData of layer.sources) {
+          const source = this.getSourceFromMastMap(
+            mastItemKey,
+            sourceData[mastItemKey],
+          );
+          if (source) {
+            sourcesToSelect.push(source);
+          }
+        }
+
+        // Deselect everything
+        this.aladin.view.unselectObjects(); // TSD Probably redundant
+        for (let overlay of this.aladin.getOverlays()) {
+          if (overlay.mastItemKey === mastItemKey) {
+            for (let source of overlay.sources) {
+              if (source.footprint) {
+                source.footprint.setLineWidth(2);
+              }
+            }
+          }
+        }
+
+        // Collect the footprints to select then select them via the view.
+        // Build the list of selected footprints by getting the footprint from each selected source.
+        const fpsToSelect = [];
+        for (const source of sourcesToSelect) {
+          const footprint = source.footprint;
+          if (footprint) {
+            fpsToSelect.push(footprint);
+            footprint.setLineWidth(4);
+          }
+        }
+
+        if (fpsToSelect.length > 0) {
+          allFpsToSelect.push(fpsToSelect);
+        }
+
+        if (sourcesToSelect.length > 0) {
+          allSourcesToSelect.push(sourcesToSelect);
+        }
+      }
+
+      //this.aladin.view.selectObjects(allFpsToSelect)
+      this.aladin.view.selectObjects(allSourcesToSelect);
     });
 
     this.eventHandlers = {

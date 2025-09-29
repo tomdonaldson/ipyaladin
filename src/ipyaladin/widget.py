@@ -193,6 +193,12 @@ class Aladin(anywidget.AnyWidget):
     # listener callback is on the python side and contains functions to link to events
     listener_callback: ClassVar[Dict[str, callable]] = {}
 
+    # Objects for Aladin to select.
+    objects_to_select = traitlets.List(
+        trait=traitlets.Any(),
+        help="A list of objects for Aladin to select.",
+    ).tag(sync=True)
+
     # overlay survey
     _survey_body = Unicode(
         "sky",
