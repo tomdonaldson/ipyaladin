@@ -241,6 +241,12 @@ export default class EventHandler {
     this.model.on("change:_rotation", () => {
       // Get the rotation value from the python
       let rotation = this.model.get("_rotation");
+
+      // Hot fix from Matthieu
+      if (rotation === this.aladin.getRotation()) {
+        return;
+      }
+
       // And propagate it to Aladin Lite
       this.aladin.setRotation(rotation);
 
