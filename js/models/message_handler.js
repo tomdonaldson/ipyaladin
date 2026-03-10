@@ -233,4 +233,24 @@ export default class MessageHandler {
     );
     URL.revokeObjectURL(url);
   }
+
+  handleSelectByMask(msg) {
+    const overlay_name = msg["overlay_name"];
+    const mask = msg["mask"];
+
+    let overlay = null;
+    for (const o of this.aladin.getOverlays()) {
+      if (o.name === overlay_name) {
+        overlay = o;
+        break;
+      }
+    }
+    console.log("found overlay = " + overlay);
+    console.log("mask = " + mask);
+
+    // set by mask...
+    if (overlay.type === 'catalog') {
+      overlay.selectByMask(mask);
+    }
+  }
 }

@@ -927,6 +927,20 @@ class Aladin(anywidget.AnyWidget):
         )
 
     @widget_should_be_loaded
+    def select_by_mask(
+        self,
+        overlay_name: str,
+        mask: List[bool],
+    ) -> None:
+        """
+        """
+        self.send({
+            "event_name": "select_by_mask",
+            "overlay_name": overlay_name,
+            "mask": mask
+        })
+
+    @widget_should_be_loaded
     def add_graphic_overlay_from_region(
         self,
         region: SupportedRegion,
